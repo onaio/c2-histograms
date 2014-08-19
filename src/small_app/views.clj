@@ -11,7 +11,7 @@
   [title]
     [:head
        [:title (str "Small-app Homepage " title)]
-          (include-css "resources/public/css/style.css")])
+          (include-css "/css/style.css")])
 
 
 
@@ -46,7 +46,7 @@
 (defn numeric-chart
   [chart-data]
   (let [chart-width 700 chart-height 300 bins 10
-        margin 0 small-margin 2
+        margin 50 small-margin 2
         extracted-data (extract-data-for-histogram chart-data bins)
         {:keys [field_label field_xpath]} chart-data
         x-series (map first extracted-data)
@@ -58,21 +58,34 @@
                               :range [0 chart-width])
         y-scale (scale/linear :domain [0 (apply max y-series)]
                               :range [0 chart-height])
-        bin-width (- (/ chart-width bins) small-margin)]
+        bin-width (- (/ chart-width bins) small-margin)
+        x-ticks (take-nth 2 (rest x-series))]
     [:table#histogram.table-bordered
      [:thead [:tr [:th field_label]]]
      [:tbody [:tr [:td
         [:svg {:width (+ margin chart-width) :height (+ margin chart-height)}
-         (unify extracted-data (fn [[x dx y]]
-                                 (let [x-scaled (float (x-scale x))
-                                       y-scaled (float (y-scale y))]
-                               [:g.bar {:transform
-                                        (svg/translate [x-scaled
-                                                        (- chart-height y-scaled)])}
-                                [:rect {:x 1
-                                        :style "fill:grey"
-                                        :height y-scaled
-                                        :width bin-width}]])))]]]]]))
+         [:g.chart {:transform (svg/translate [margin 0])}
+          [:g
+          (unify extracted-data
+                 (fn [[x dx y]]
+                   (let [x-scaled (float (x-scale x))
+                         y-scaled (float (y-scale y))]
+                     [:g.bars {:transform
+                              (svg/translate [x-scaled
+                                              (- chart-height y-scaled)])}
+                      [:rect {:x 1
+                              :height y-scaled
+                              :width bin-width}]])))]
+          [:g.axis {:transform (svg/translate [0 chart-height])}
+          (unify x-ticks
+                   (fn [x]
+                   [:g.tick {:transform (svg/translate
+                                         [(float (x-scale x)) 0])
+                             :style "opacity: 1;"}
+                    [:text {:y 25 :text-anchor "middle"} x]
+                    [:line.tick {:y2 10 :x2 0}]]))
+           [:line {:x1 0 :x2 chart-width}]]
+          ]]]]]]))
 
 (defn category-chart [chart-data]
   (let [bar-max-width 500
@@ -99,10 +112,16 @@
 
 (defn data-for-qn [qn]
   (:body (client/get
-          (str "http://localhost:3000/" qn ".json")
+; NOTE: to start the ring server up for the first time, the API should hit ona
+; once the server is up, you can uncomment the 3000 line so that subsequent
+; requests (which happen at compile time) are faster.
+;          (str "http://localhost:3000/" qn ".json")
+          (str "https://ona.io/api/v1/charts/196.json?field_name=" qn)
           {:as :json})))
 
+(def n-data-5 (data-for-qn "q5"))
 (def n-data (data-for-qn "q8"))
+(def c-data-18 (data-for-qn "q18"))
 (def c-data (data-for-qn "q18a"))
 
 (defn home-page
@@ -110,5 +129,7 @@
   (html5
    (gen-page-head "Home")
    [:div [:div#container
+     (category-chart c-data-18)
      (category-chart c-data)
+     (numeric-chart n-data-5)
      (numeric-chart n-data)]]))
