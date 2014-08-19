@@ -11,8 +11,9 @@ h1 {
         color: CornflowerBlue;
 }
 
-.bars rect {
+.bars {
   fill: steelblue;
+  background-color: steelblue;
 }
 
 .axis text {
