@@ -2,7 +2,7 @@
   (:use [hiccup.page :only [html5 include-css]]
         [c2.layout.histogram :only [histogram]]
         [c2.core :only [unify]]
-        [clojure.math.numeric-tower :only [gcd lcm]])
+        [clojure.math.numeric-tower :only [gcd lcm floor]])
   (:require [clojure.string :as str]
             [c2.scale :as scale]
             [clj-http.client :as client]
@@ -19,6 +19,25 @@
    (include-css "//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css")])
 
 
+(defn- num-bins
+  "Determine number of bins if there are n possible of values of data.
+   Custom algorithm, based on a pleasant range of bins being between
+   roughly 7 and 15 (though customizable). Idea is that we try to divide
+   n into a number between "
+  [n &{:keys [data-type]
+       :or   {data-type "int"}}]
+  (let [rough-min 7 rough-max 15 real-max 30
+        scale #(case data-type
+                 "int" %
+                 "date" (/ % 86400000))
+        n (scale n)
+        full-range (range rough-min rough-max)
+        potential-bins (map (partial gcd n) full-range)
+        best-guess-bins (apply max potential-bins)]
+    (prn n)
+    (if (< best-guess-bins rough-min)
+     (apply (partial min real-max n) (map (partial lcm n) full-range))
+     best-guess-bins)))
 
 (defn- style [& info]
   {:style (.trim (apply str (reduce
@@ -33,9 +52,10 @@
                [(na-fix ((keyword field_xpath) data-item))
                 (:count data-item)]))))
 
+
 (defn- extract-data-for-histogram
-  [chart-data bins &{:keys [data-type]
-                     :or   {data-type "int"}}]
+  [chart-data &{:keys [data-type]
+                :or   {data-type "int"}}]
   (let [{:keys [data field_xpath]} chart-data
         retype-fn (case data-type
                     "int" #(Integer. %)
@@ -45,21 +65,27 @@
         retyped-data (map (fn [el]
                             (assoc el qn-key (retype-fn (qn-key el))))
                           non-nil-data)
+        data-range (- (apply max (map qn-key retyped-data))
+                      (apply min (map qn-key retyped-data)))
+        bins (num-bins data-range :data-type data-type)
         binned-data (histogram retyped-data :value qn-key :bins bins)]
-    (for [data-item binned-data]
-      [(:x (meta data-item))
-       (:dx (meta data-item))
-       (apply + (map :count data-item))])))
+    (with-meta
+      (for [data-item binned-data]
+        [(:x (meta data-item))
+         (:dx (meta data-item))
+         (apply + (map :count data-item))])
+      {:bins bins})))
 
-; (extract-data-for-histogram d-data 10 :data-type "date")
+; (extract-data-for-histogram d-data :data-type "date")
 ;(extract-data-for-histogram (data-for-qn "q8"))
 
 (defn numeric-chart
   [chart-data &{:keys [data-type]
                      :or   {data-type "int"}}]
-  (let [chart-width 700 chart-height 300 bins 10
+  (let [chart-width 700 chart-height 300
         margin 50 small-margin 2
-        extracted-data (extract-data-for-histogram chart-data bins :data-type data-type)
+        extracted-data (extract-data-for-histogram chart-data :data-type data-type)
+        bins (:bins (meta extracted-data))
         {:keys [field_label field_xpath]} chart-data
         x-series (map first extracted-data)
         dx-series (map second extracted-data)
@@ -73,7 +99,7 @@
         bin-width (- (/ chart-width bins) small-margin)
         x-ticks (take-nth 2 (rest x-series))
         fmt (case data-type
-                    "int" #(str (float %))
+                    "int" #(format "%.1f" (float %))
                     "date" #(tf/unparse (tf/formatters :year-month-day)
                                         (tc/from-long %)))]
     [:table#histogram.table
