@@ -121,9 +121,13 @@
                       [:g.bars {:transform
                                 (svg/translate
                                  [x-scaled (- chart-height y-scaled)])}
-                       [:rect {:x 1
+                       [:g [:rect {:x 1
                                :height y-scaled
-                               :width bin-width}]])))]
+                               :width bin-width}]]
+                       (when (>= y-scaled (* small-margin 4))
+                       [:text {:y small-margin :x (/ bin-width 2) :dy "1em"
+                               :text-anchor "middle"} y])
+                       ])))]
           [:g.axis {:transform (svg/translate [0 chart-height])}
            (unify x-ticks
                   (fn [x]
