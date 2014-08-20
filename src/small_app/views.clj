@@ -1,7 +1,8 @@
 (ns small-app.views
-  (:use ; [hiccup.page :only [html5 include-css]]
+  (:use [hiccup.page :only [html5 include-css]]
         [c2.layout.histogram :only [histogram]]
-        [c2.core :only [unify]])
+        [c2.core :only [unify]]
+        [clojure.math.numeric-tower :only [gcd lcm]])
   (:require [clojure.string :as str]
             [c2.scale :as scale]
             [clj-http.client :as client]
@@ -54,10 +55,11 @@
 ;(extract-data-for-histogram (data-for-qn "q8"))
 
 (defn numeric-chart
-  [chart-data]
+  [chart-data &{:keys [data-type]
+                     :or   {data-type "int"}}]
   (let [chart-width 700 chart-height 300 bins 10
         margin 50 small-margin 2
-        extracted-data (extract-data-for-histogram chart-data bins)
+        extracted-data (extract-data-for-histogram chart-data bins :data-type data-type)
         {:keys [field_label field_xpath]} chart-data
         x-series (map first extracted-data)
         dx-series (map second extracted-data)
@@ -69,7 +71,11 @@
         y-scale (scale/linear :domain [0 (apply max y-series)]
                               :range [0 chart-height])
         bin-width (- (/ chart-width bins) small-margin)
-        x-ticks (take-nth 2 (rest x-series))]
+        x-ticks (take-nth 2 (rest x-series))
+        fmt (case data-type
+                    "int" #(str (float %))
+                    "date" #(tf/unparse (tf/formatters :year-month-day)
+                                        (tc/from-long %)))]
     [:table#histogram.table
      [:thead [:tr [:th field_label]]]
      [:tbody
@@ -94,9 +100,10 @@
                     [:g.tick {:transform (svg/translate
                                           [(float (x-scale x)) 0])
                               :style "opacity: 1;"}
-                     [:text {:y 25 :text-anchor "middle"} x]
+                     [:text {:y 25 :text-anchor "middle"} (fmt x)]
                      [:line.tick {:y2 10 :x2 0}]]))
            [:line {:x1 0 :x2 chart-width}]]]]]]]]))
+
 
 (defn category-chart [chart-data]
   (let [bar-max-width 500
@@ -135,8 +142,6 @@
 (def c-data (data-for-qn "q18a"))
 (def d-data (data-for-qn "_submission_time"))
 
-
-
 (defn home-page
   []
   (html5
@@ -145,4 +150,5 @@
           (category-chart c-data-18)
           (category-chart c-data)
           (numeric-chart n-data-5)
-          (numeric-chart n-data)]]))
+          (numeric-chart n-data)
+          (numeric-chart d-data :data-type "date")]]))

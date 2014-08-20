@@ -6,7 +6,8 @@
                  [com.keminglabs/c2 "0.2.3"]
                  [clj-http "0.9.1"]
                  [hiccup "1.0.2"]
-                 [clj-time "0.8.0"]]
+                 [clj-time "0.8.0"]
+                 [org.clojure/math.numeric-tower "0.0.4"]]
   :plugins [[lein-ring "0.8.11"]]
   :ring {:handler small-app.handler/app}
   :profiles
