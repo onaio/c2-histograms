@@ -18,6 +18,24 @@
    (include-css "/css/style.css")
    (include-css "//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css")])
 
+(defn- style
+  "Helper function to create the style argument in hiccup vectors,
+  which looks like {:style 'height:200px;width:100px'} etc."
+  [& info]
+  {:style (.trim (apply str (reduce
+                             #(conj %1 (-> %2 first name) ":" (last %2) ";")
+                             []
+                             (partition 2 info))))})
+
+(defn- extract-data-for-barchart
+  "Take chart-data from the ona API, return bar-chart friendly data.
+  Makes nil into 'NA' in the process."
+  [chart-data]
+  (let [{:keys [data field_xpath]} chart-data
+        na-fix (fn [s] (if (nil? s) "NA" (str s)))]
+    (into {} (for [data-item data]
+               [(na-fix ((keyword field_xpath) data-item))
+                (:count data-item)]))))
 
 (defn- num-bins
   "Determine number of bins if there are n possible of values of data.
@@ -27,33 +45,18 @@
   [n &{:keys [data-type]
        :or   {data-type "int"}}]
   (let [rough-min 7 rough-max 15 real-max 30
-        scale #(case data-type
-                 "int" %
+        scale #(case data-type "int" %
                  "date" (/ % 86400000))
         n (scale n)
         full-range (range rough-min rough-max)
-        potential-bins (map (partial gcd n) full-range)
-        best-guess-bins (apply max potential-bins)]
-    (prn n)
-    (if (< best-guess-bins rough-min)
+        best-guess (apply max (map (partial gcd n) full-range))]
+    (if (< best-guess rough-min)
      (apply (partial min real-max n) (map (partial lcm n) full-range))
-     best-guess-bins)))
-
-(defn- style [& info]
-  {:style (.trim (apply str (reduce
-                             #(conj %1 (-> %2 first name) ":" (last %2) ";")
-                             []
-                             (partition 2 info))))})
-
-(defn- extract-data-for-barchart [chart-data]
-  (let [{:keys [data field_xpath]} chart-data
-        na-fix (fn [s] (if (nil? s) "NA" (str s)))]
-    (into {} (for [data-item data]
-               [(na-fix ((keyword field_xpath) data-item))
-                (:count data-item)]))))
-
+     best-guess)))
 
 (defn- extract-data-for-histogram
+  "Turn numerical / date chart-data from ona API histogram-friendly.
+  Return data looks like [(x dx y)] with-meta {:bins num-bins}."
   [chart-data &{:keys [data-type]
                 :or   {data-type "int"}}]
   (let [{:keys [data field_xpath]} chart-data
@@ -80,6 +83,7 @@
 ;(extract-data-for-histogram (data-for-qn "q8"))
 
 (defn numeric-chart
+  "Create numeric (or date) chart out of some chart-data from ona API."
   [chart-data &{:keys [data-type]
                      :or   {data-type "int"}}]
   (let [chart-width 700 chart-height 300
@@ -132,6 +136,7 @@
 
 
 (defn category-chart [chart-data]
+  "Create category bar chart out of some chart-data from ona API."
   (let [bar-max-width 500
         bar-height 20 other-width 50
         {:keys [field_xpath field_label]} chart-data
