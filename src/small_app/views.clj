@@ -44,7 +44,7 @@
    n into a number between "
   [n &{:keys [data-type]
        :or   {data-type "int"}}]
-  (let [rough-min 7 rough-max 15 real-max 30
+  (let [rough-min 7 rough-max 15 real-max 24
         scale #(case data-type "int" %
                  "date" (/ % 86400000))
         n (scale n)
@@ -172,6 +172,7 @@
 (def c-data-18 (data-for-qn "q18"))
 (def c-data (data-for-qn "q18a"))
 (def d-data (data-for-qn "_submission_time"))
+(def d-data-2 (data-for-qn "end"))
 
 (defn home-page
   []
@@ -182,4 +183,5 @@
           (category-chart c-data)
           (numeric-chart n-data-5)
           (numeric-chart n-data)
-          (numeric-chart d-data :data-type "date")]]))
+          (numeric-chart d-data :data-type "date")
+          (numeric-chart d-data-2 :data-type "date")]]))
